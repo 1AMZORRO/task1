@@ -145,6 +145,7 @@ class MambaRNA(nn.Module):
                 x = self.dropout(x)
         else:
             # LSTM
+            original_seq_len = x.size(1)
             if attention_mask is not None:
                 # 计算实际序列长度
                 lengths = attention_mask.sum(dim=1).cpu()
@@ -155,7 +156,9 @@ class MambaRNA(nn.Module):
             x, _ = self.encoder(x)
             
             if attention_mask is not None:
-                x, _ = nn.utils.rnn.pad_packed_sequence(x, batch_first=True)
+                x, _ = nn.utils.rnn.pad_packed_sequence(
+                    x, batch_first=True, total_length=original_seq_len
+                )
             
             x = self.projection(x)
         
