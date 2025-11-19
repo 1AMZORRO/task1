@@ -210,35 +210,63 @@ RNA序列: "AUGC"
 
 **文件**: `rna_fitness/utils/metrics.py`
 
-**评估指标**:
+**RNAGym标准评估指标**（主要）:
 
-1. **MSE (Mean Squared Error)**
+1. **Spearman相关系数（绝对值）**
+   ```python
+   spearman = abs(spearmanr(predictions, labels).correlation)
+   ```
+   - 秩相关，衡量单调关系
+   - 范围[0, 1]（取绝对值）
+   - 越接近1越好
+
+2. **AUC (Area Under ROC Curve)**
+   ```python
+   # 使用中位数作为阈值二分类
+   binary_labels = (labels > median(labels)).astype(int)
+   auc = max(roc_auc_score(binary_labels, predictions), 1 - auc)
+   ```
+   - ROC曲线下面积
+   - 范围[0.5, 1.0]（取max(auc, 1-auc)确保>=0.5）
+   - 越接近1越好
+
+3. **MCC (Matthews Correlation Coefficient，绝对值)**
+   ```python
+   binary_labels = (labels > median(labels)).astype(int)
+   binary_preds = (predictions > median(predictions)).astype(int)
+   mcc = abs(matthews_corrcoef(binary_labels, binary_preds))
+   ```
+   - 马修斯相关系数，评估二分类质量
+   - 范围[0, 1]（取绝对值）
+   - 越接近1越好
+
+**额外提供的指标**:
+
+4. **MSE (Mean Squared Error)**
    ```
    MSE = (1/n) Σ(y_pred - y_true)²
    ```
    - 衡量预测值与真实值的平均平方误差
    - 越小越好
 
-2. **RMSE (Root Mean Squared Error)**
+5. **RMSE (Root Mean Squared Error)**
    ```
    RMSE = √MSE
    ```
    - MSE的平方根，与原始数据同量级
 
-3. **R² (R-squared)**
+6. **R² (R-squared)**
    ```
    R² = 1 - (SS_res / SS_tot)
    ```
    - 决定系数，范围[0, 1]
    - 越接近1越好
 
-4. **Spearman相关系数**
-   - 秩相关，衡量单调关系
-   - 范围[-1, 1]
-
-5. **Pearson相关系数**
+7. **Pearson相关系数**
    - 线性相关
    - 范围[-1, 1]
+
+> **注意**: RNAGym使用Spearman (abs), AUC, MCC作为主要评估指标，这与论文中的标准一致。
 
 ### 4. 配置层 (configs/)
 
