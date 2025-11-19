@@ -1,0 +1,27 @@
+# 核心依赖
+torch>=2.0.0
+numpy>=1.24.0
+pandas>=2.0.0
+scikit-learn>=1.3.0
+
+# Mamba SSM 模型
+mamba-ssm>=1.0.0
+causal-conv1d>=1.1.0
+
+# 数据处理
+biopython>=1.81
+pyyaml>=6.0
+
+# 训练工具
+tqdm>=4.65.0
+tensorboard>=2.13.0
+wandb>=0.15.0
+
+# 工具
+einops>=0.7.0
+transformers>=4.30.0
+
+# 开发依赖
+pytest>=7.4.0
+black>=23.0.0
+flake8>=6.0.0
