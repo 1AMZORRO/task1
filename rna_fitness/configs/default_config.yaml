@@ -1,0 +1,62 @@
+# RNA Fitness预测模型配置文件
+# 参照RNAGym标准
+
+# 模型配置
+model:
+  vocab_size: 8  # RNA: 4个碱基 + 4个特殊token
+  d_model: 256   # 模型维度
+  n_layers: 4    # Mamba层数
+  d_state: 16    # 状态空间维度
+  d_conv: 4      # 卷积核大小
+  expand: 2      # 扩展因子
+  dropout: 0.1   # Dropout比率
+  use_mamba: true  # 是否使用Mamba（false时使用LSTM）
+
+# 数据配置
+data:
+  max_length: 512  # 最大序列长度
+  batch_size: 32   # 批次大小
+  num_workers: 4   # 数据加载线程数
+  train_path: null  # 训练数据路径
+  val_path: null    # 验证数据路径
+  test_path: null   # 测试数据路径
+
+# 训练配置
+training:
+  num_epochs: 100        # 训练轮数
+  learning_rate: 0.001   # 学习率
+  weight_decay: 0.01     # 权重衰减
+  warmup_steps: 1000     # 预热步数
+  gradient_clip: 1.0     # 梯度裁剪
+  eval_every: 1          # 每N个epoch评估一次
+  save_every: 5          # 每N个epoch保存一次
+  early_stopping_patience: 10  # 早停耐心值
+
+# 优化器配置
+optimizer:
+  type: "adamw"  # adamw, adam, sgd
+  betas: [0.9, 0.999]
+  eps: 1.0e-8
+
+# 学习率调度器
+scheduler:
+  type: "cosine"  # cosine, linear, constant
+  num_warmup_steps: 1000
+  num_training_steps: 10000
+
+# 输出配置
+output:
+  log_dir: "./logs"
+  checkpoint_dir: "./checkpoints"
+  result_dir: "./results"
+  use_tensorboard: true
+  use_wandb: false
+  wandb_project: "rna-fitness-mamba"
+
+# 设备配置
+device:
+  cuda: true
+  device_id: 0
+
+# 随机种子
+seed: 42
