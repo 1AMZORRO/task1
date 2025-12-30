@@ -62,12 +62,13 @@ class RNATokenizer:
 class RNAGymDataset(Dataset):
     """RNAGym数据集"""
     
-    def __init__(self, csv_files, tokenizer, max_length=512):
+    def __init__(self, csv_files, tokenizer, max_length=512, normalize=True):
         """
         Args:
             csv_files: CSV文件路径或路径列表
             tokenizer: RNA分词器
             max_length: 最大序列长度
+            normalize: 是否对fitness值进行log变换和标准化
         """
         # 支持单个文件或多个文件
         if isinstance(csv_files, str):
@@ -85,6 +86,25 @@ class RNAGymDataset(Dataset):
         self.data = pd.concat(all_data, ignore_index=True)
         self.tokenizer = tokenizer
         self.max_length = max_length
+        self.normalize = normalize
+        
+        # 对fitness值进行log变换和标准化
+        if self.normalize:
+            # log变换 (添加一个小的epsilon避免log(0))
+            self.data['fitness_log'] = np.log(self.data['DMS_score'] + 1e-10)
+            
+            # 计算均值和标准差用于标准化
+            self.fitness_mean = self.data['fitness_log'].mean()
+            self.fitness_std = self.data['fitness_log'].std()
+            
+            # 标准化
+            self.data['fitness_normalized'] = (self.data['fitness_log'] - self.fitness_mean) / self.fitness_std
+            
+            print(f"\nFitness标准化信息:")
+            print(f"  原始值范围: {self.data['DMS_score'].min():.6f} - {self.data['DMS_score'].max():.6f}")
+            print(f"  Log变换后范围: {self.data['fitness_log'].min():.2f} - {self.data['fitness_log'].max():.2f}")
+            print(f"  标准化后均值: {self.data['fitness_normalized'].mean():.6f}")
+            print(f"  标准化后标准差: {self.data['fitness_normalized'].std():.6f}")
         
         print(f"\n总样本数量: {len(self.data)}")
         
@@ -94,7 +114,12 @@ class RNAGymDataset(Dataset):
     def __getitem__(self, idx):
         row = self.data.iloc[idx]
         sequence = row['sequence']
-        fitness = row['DMS_score']
+        
+        # 使用标准化后的fitness值
+        if self.normalize:
+            fitness = row['fitness_normalized']
+        else:
+            fitness = row['DMS_score']
         
         # 编码序列
         input_ids = self.tokenizer.encode(sequence, self.max_length)
@@ -103,10 +128,31 @@ class RNAGymDataset(Dataset):
             'input_ids': torch.tensor(input_ids, dtype=torch.long),
             'fitness': torch.tensor(fitness, dtype=torch.float32)
         }
+    
+    def denormalize(self, normalized_values):
+        """
+        将标准化后的预测值转换回原始尺度
+        
+        Args:
+            normalized_values: 标准化后的值
+            
+        Returns:
+            原始尺度的值
+        """
+        if not self.normalize:
+            return normalized_values
+        
+        # 反标准化
+        log_values = normalized_values * self.fitness_std + self.fitness_mean
+        
+        # 反log变换
+        original_values = np.exp(log_values) - 1e-10
+        
+        return original_values
 
 
 def load_rnagym_data(data_dir, dataset_names, tokenizer, batch_size=32, 
-                     train_ratio=0.8, max_length=512, num_workers=0):
+                     train_ratio=0.8, max_length=512, num_workers=0, normalize=True):
     """
     加载RNAGym数据集并划分训练集和验证集
     
@@ -118,9 +164,10 @@ def load_rnagym_data(data_dir, dataset_names, tokenizer, batch_size=32,
         train_ratio: 训练集比例
         max_length: 最大序列长度
         num_workers: 数据加载器worker数量
+        normalize: 是否标准化fitness值
         
     Returns:
-        train_loader, val_loader: 训练和验证数据加载器
+        train_loader, val_loader, full_dataset: 训练和验证数据加载器，以及完整数据集对象
     """
     # 支持单个数据集或多个数据集
     if isinstance(dataset_names, str):
@@ -130,7 +177,7 @@ def load_rnagym_data(data_dir, dataset_names, tokenizer, batch_size=32,
     csv_files = [os.path.join(data_dir, f"{name}.csv") for name in dataset_names]
     
     # 创建数据集
-    full_dataset = RNAGymDataset(csv_files, tokenizer, max_length)
+    full_dataset = RNAGymDataset(csv_files, tokenizer, max_length, normalize=normalize)
     
     # 划分训练集和验证集
     total_size = len(full_dataset)
@@ -162,7 +209,7 @@ def load_rnagym_data(data_dir, dataset_names, tokenizer, batch_size=32,
         pin_memory=True
     )
     
-    return train_loader, val_loader
+    return train_loader, val_loader, full_dataset
 
 
 def get_available_datasets(data_dir):

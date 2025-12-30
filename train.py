@@ -15,7 +15,7 @@ from utils.metrics import calculate_all_metrics, print_metrics
 from utils.visualization import plot_training_curves, plot_prediction_scatter, save_results_summary
 
 
-def train_epoch(model, train_loader, criterion, optimizer, device):
+def train_epoch(model, train_loader, criterion, optimizer, device, dataset=None):
     """训练一个epoch"""
     model.train()
     total_loss = 0
@@ -31,7 +31,7 @@ def train_epoch(model, train_loader, criterion, optimizer, device):
         optimizer.zero_grad()
         predictions = model(input_ids)
         
-        # 计算损失
+        # 计算损失（在标准化空间）
         loss = criterion(predictions, targets)
         
         # 反向传播
@@ -45,12 +45,23 @@ def train_epoch(model, train_loader, criterion, optimizer, device):
         pbar.set_postfix({'loss': f'{loss.item():.4f}'})
     
     avg_loss = total_loss / len(train_loader)
-    metrics = calculate_all_metrics(all_targets, all_preds)
+    
+    # 将预测值和目标值转换为numpy数组
+    all_preds = np.array(all_preds)
+    all_targets = np.array(all_targets)
+    
+    # 如果使用了标准化，反标准化后再计算指标
+    if dataset is not None and dataset.normalize:
+        all_preds_original = dataset.denormalize(all_preds)
+        all_targets_original = dataset.denormalize(all_targets)
+        metrics = calculate_all_metrics(all_targets_original, all_preds_original)
+    else:
+        metrics = calculate_all_metrics(all_targets, all_preds)
     
     return avg_loss, metrics
 
 
-def validate(model, val_loader, criterion, device):
+def validate(model, val_loader, criterion, device, dataset=None):
     """验证模型"""
     model.eval()
     total_loss = 0
@@ -66,7 +77,7 @@ def validate(model, val_loader, criterion, device):
             # 前向传播
             predictions = model(input_ids)
             
-            # 计算损失
+            # 计算损失（在标准化空间）
             loss = criterion(predictions, targets)
             
             total_loss += loss.item()
@@ -76,9 +87,20 @@ def validate(model, val_loader, criterion, device):
             pbar.set_postfix({'loss': f'{loss.item():.4f}'})
     
     avg_loss = total_loss / len(val_loader)
-    metrics = calculate_all_metrics(all_targets, all_preds)
     
-    return avg_loss, metrics, np.array(all_targets), np.array(all_preds)
+    # 将预测值和目标值转换为numpy数组
+    all_preds = np.array(all_preds)
+    all_targets = np.array(all_targets)
+    
+    # 如果使用了标准化，反标准化后再计算指标
+    if dataset is not None and dataset.normalize:
+        all_preds_original = dataset.denormalize(all_preds)
+        all_targets_original = dataset.denormalize(all_targets)
+        metrics = calculate_all_metrics(all_targets_original, all_preds_original)
+    else:
+        metrics = calculate_all_metrics(all_targets, all_preds)
+    
+    return avg_loss, metrics, all_targets, all_preds
 
 
 def train(args):
@@ -97,14 +119,15 @@ def train(args):
     
     # 加载数据
     print(f"\n加载数据集: {args.datasets}")
-    train_loader, val_loader = load_rnagym_data(
+    train_loader, val_loader, dataset = load_rnagym_data(
         data_dir=args.data_dir,
         dataset_names=args.datasets,
         tokenizer=tokenizer,
         batch_size=args.batch_size,
         train_ratio=args.train_ratio,
         max_length=args.max_length,
-        num_workers=args.num_workers
+        num_workers=args.num_workers,
+        normalize=True  # 启用标准化
     )
     
     # 创建模型
@@ -144,7 +167,7 @@ def train(args):
         print(f"{'='*60}")
         
         # 训练
-        train_loss, train_metrics = train_epoch(model, train_loader, criterion, optimizer, device)
+        train_loss, train_metrics = train_epoch(model, train_loader, criterion, optimizer, device, dataset)
         train_losses.append(train_loss)
         train_metrics_history.append(train_metrics)
         
@@ -152,7 +175,7 @@ def train(args):
         print_metrics(train_metrics, prefix="训练集 ")
         
         # 验证
-        val_loss, val_metrics, val_targets, val_preds = validate(model, val_loader, criterion, device)
+        val_loss, val_metrics, val_targets, val_preds = validate(model, val_loader, criterion, device, dataset)
         val_losses.append(val_loss)
         val_metrics_history.append(val_metrics)
         
@@ -194,14 +217,22 @@ def train(args):
     model.load_state_dict(checkpoint['model_state_dict'])
     
     # 最终验证
-    _, final_metrics, final_targets, final_preds = validate(model, val_loader, criterion, device)
+    _, final_metrics, final_targets, final_preds = validate(model, val_loader, criterion, device, dataset)
     
     print("\n最终评估结果:")
     print_metrics(final_metrics)
     
+    # 反标准化用于可视化
+    if dataset.normalize:
+        final_targets_original = dataset.denormalize(final_targets)
+        final_preds_original = dataset.denormalize(final_preds)
+    else:
+        final_targets_original = final_targets
+        final_preds_original = final_preds
+    
     # 保存预测散点图
     scatter_path = os.path.join(args.output_dir, 'prediction_scatter.png')
-    plot_prediction_scatter(final_targets, final_preds, final_metrics, save_path=scatter_path)
+    plot_prediction_scatter(final_targets_original, final_preds_original, final_metrics, save_path=scatter_path)
     
     # 保存结果摘要
     summary_path = os.path.join(args.output_dir, 'results_summary.txt')

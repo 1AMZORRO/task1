@@ -37,14 +37,15 @@ def evaluate_model(model_path, data_dir, dataset_names, output_dir):
     
     # 加载数据
     tokenizer = RNATokenizer()
-    train_loader, val_loader = load_rnagym_data(
+    train_loader, val_loader, dataset = load_rnagym_data(
         data_dir=data_dir,
         dataset_names=dataset_names,
         tokenizer=tokenizer,
         batch_size=32,
         train_ratio=0.8,
         max_length=512,
-        num_workers=0
+        num_workers=0,
+        normalize=True
     )
     
     # 评估
@@ -66,8 +67,16 @@ def evaluate_model(model_path, data_dir, dataset_names, output_dir):
     all_preds = np.array(all_preds)
     all_targets = np.array(all_targets)
     
+    # 反标准化
+    if dataset.normalize:
+        all_preds_original = dataset.denormalize(all_preds)
+        all_targets_original = dataset.denormalize(all_targets)
+    else:
+        all_preds_original = all_preds
+        all_targets_original = all_targets
+    
     # 计算指标
-    metrics = calculate_all_metrics(all_targets, all_preds)
+    metrics = calculate_all_metrics(all_targets_original, all_preds_original)
     
     print("\n最终评估结果:")
     print_metrics(metrics)
@@ -75,7 +84,7 @@ def evaluate_model(model_path, data_dir, dataset_names, output_dir):
     # 保存可视化
     os.makedirs(output_dir, exist_ok=True)
     scatter_path = os.path.join(output_dir, 'prediction_scatter.png')
-    plot_prediction_scatter(all_targets, all_preds, metrics, save_path=scatter_path)
+    plot_prediction_scatter(all_targets_original, all_preds_original, metrics, save_path=scatter_path)
     
     # 保存结果摘要
     summary_path = os.path.join(output_dir, 'results_summary.txt')
