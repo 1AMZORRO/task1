@@ -70,7 +70,7 @@ def plot_training_curves(train_losses, val_losses, train_metrics=None, val_metri
         ax.legend()
         ax.grid(True, alpha=0.3)
     else:
-        # 如果没有指标数据，隐藏其他子图
+        # If no metrics data, hide other subplots
         for i in range(1, 4):
             row, col = divmod(i, 2)
             axes[row, col].axis('off')

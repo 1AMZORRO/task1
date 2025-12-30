@@ -17,7 +17,7 @@ from tqdm import tqdm
 
 
 def evaluate_model(model_path, data_dir, dataset_names, output_dir):
-    """评估模型"""
+    """Evaluate trained model"""
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
@@ -94,15 +94,15 @@ def evaluate_model(model_path, data_dir, dataset_names, output_dir):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='评估训练好的模型')
+    parser = argparse.ArgumentParser(description='Evaluate trained model')
     parser.add_argument('--model_path', type=str, default='outputs_test/best_model.pt',
-                        help='模型文件路径')
+                        help='Model file path')
     parser.add_argument('--data_dir', type=str, default='data/RNAGym',
-                        help='数据目录')
+                        help='Data directory')
     parser.add_argument('--datasets', type=str, nargs='+', default=['Andreasson_2020_ribozyme'],
-                        help='数据集名称（可以指定多个）')
+                        help='Dataset name(s) (can specify multiple)')
     parser.add_argument('--output_dir', type=str, default='outputs_test',
-                        help='输出目录')
+                        help='Output directory')
     
     args = parser.parse_args()
     evaluate_model(args.model_path, args.data_dir, args.datasets, args.output_dir)

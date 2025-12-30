@@ -16,25 +16,25 @@ from utils.visualization import plot_training_curves, plot_prediction_scatter, s
 
 
 def train_epoch(model, train_loader, criterion, optimizer, device, dataset=None):
-    """训练一个epoch"""
+    """Train for one epoch"""
     model.train()
     total_loss = 0
     all_preds = []
     all_targets = []
     
-    pbar = tqdm(train_loader, desc='训练中')
+    pbar = tqdm(train_loader, desc='Training')
     for batch in pbar:
         input_ids = batch['input_ids'].to(device)
         targets = batch['fitness'].to(device)
         
-        # 前向传播
+        # Forward pass
         optimizer.zero_grad()
         predictions = model(input_ids)
         
-        # 计算损失（在标准化空间）
+        # Calculate loss (in normalized space)
         loss = criterion(predictions, targets)
         
-        # 反向传播
+        # Backward pass
         loss.backward()
         optimizer.step()
         
@@ -46,11 +46,11 @@ def train_epoch(model, train_loader, criterion, optimizer, device, dataset=None)
     
     avg_loss = total_loss / len(train_loader)
     
-    # 将预测值和目标值转换为numpy数组
+    # Convert to numpy arrays
     all_preds = np.array(all_preds)
     all_targets = np.array(all_targets)
     
-    # 如果使用了标准化，反标准化后再计算指标
+    # Denormalize before calculating metrics if normalized
     if dataset is not None and dataset.normalize:
         all_preds_original = dataset.denormalize(all_preds)
         all_targets_original = dataset.denormalize(all_targets)
@@ -62,22 +62,22 @@ def train_epoch(model, train_loader, criterion, optimizer, device, dataset=None)
 
 
 def validate(model, val_loader, criterion, device, dataset=None):
-    """验证模型"""
+    """Validate model"""
     model.eval()
     total_loss = 0
     all_preds = []
     all_targets = []
     
     with torch.no_grad():
-        pbar = tqdm(val_loader, desc='验证中')
+        pbar = tqdm(val_loader, desc='Validating')
         for batch in pbar:
             input_ids = batch['input_ids'].to(device)
             targets = batch['fitness'].to(device)
             
-            # 前向传播
+            # Forward pass
             predictions = model(input_ids)
             
-            # 计算损失（在标准化空间）
+            # Calculate loss (in normalized space)
             loss = criterion(predictions, targets)
             
             total_loss += loss.item()
@@ -88,11 +88,11 @@ def validate(model, val_loader, criterion, device, dataset=None):
     
     avg_loss = total_loss / len(val_loader)
     
-    # 将预测值和目标值转换为numpy数组
+    # Convert to numpy arrays
     all_preds = np.array(all_preds)
     all_targets = np.array(all_targets)
     
-    # 如果使用了标准化，反标准化后再计算指标
+    # Denormalize before calculating metrics if normalized
     if dataset is not None and dataset.normalize:
         all_preds_original = dataset.denormalize(all_preds)
         all_targets_original = dataset.denormalize(all_targets)
@@ -242,60 +242,60 @@ def train(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='RNA Fitness预测模型训练')
+    parser = argparse.ArgumentParser(description='RNA Fitness Prediction Model Training')
     
-    # 数据参数
+    # Data parameters
     parser.add_argument('--data_dir', type=str, default='data/RNAGym',
-                        help='数据目录路径')
+                        help='Data directory path')
     parser.add_argument('--datasets', type=str, nargs='+', default=['Andreasson_2020_ribozyme'],
-                        help='数据集名称（可以指定多个）')
+                        help='Dataset name(s) (can specify multiple)')
     parser.add_argument('--max_length', type=int, default=512,
-                        help='最大序列长度')
+                        help='Maximum sequence length')
     parser.add_argument('--train_ratio', type=float, default=0.8,
-                        help='训练集比例')
+                        help='Training set ratio')
     
-    # 模型参数
+    # Model parameters
     parser.add_argument('--d_model', type=int, default=256,
-                        help='模型维度')
+                        help='Model dimension')
     parser.add_argument('--n_layers', type=int, default=4,
-                        help='Mamba层数')
+                        help='Number of Mamba layers')
     parser.add_argument('--d_state', type=int, default=16,
-                        help='SSM状态维度')
+                        help='SSM state dimension')
     parser.add_argument('--d_conv', type=int, default=4,
-                        help='卷积核大小')
+                        help='Convolution kernel size')
     parser.add_argument('--expand', type=int, default=2,
-                        help='扩展因子')
+                        help='Expansion factor')
     parser.add_argument('--dropout', type=float, default=0.1,
-                        help='Dropout率')
+                        help='Dropout rate')
     
-    # 训练参数
+    # Training parameters
     parser.add_argument('--batch_size', type=int, default=32,
-                        help='批次大小')
+                        help='Batch size')
     parser.add_argument('--epochs', type=int, default=50,
-                        help='训练轮数')
+                        help='Number of training epochs')
     parser.add_argument('--learning_rate', type=float, default=1e-4,
-                        help='学习率')
+                        help='Learning rate')
     parser.add_argument('--weight_decay', type=float, default=0.01,
-                        help='权重衰减')
+                        help='Weight decay')
     parser.add_argument('--num_workers', type=int, default=0,
-                        help='数据加载worker数量')
+                        help='Number of dataloader workers')
     
-    # 输出参数
+    # Output parameters
     parser.add_argument('--output_dir', type=str, default='outputs',
-                        help='输出目录')
+                        help='Output directory')
     parser.add_argument('--plot_interval', type=int, default=5,
-                        help='绘图间隔(epoch)')
+                        help='Plot interval (epochs)')
     
     args = parser.parse_args()
     
-    # 显示可用数据集
-    print("\n可用的数据集:")
+    # Display available datasets
+    print("\nAvailable datasets:")
     available_datasets = get_available_datasets(args.data_dir)
     for i, ds in enumerate(available_datasets, 1):
         marker = "✓" if ds in args.datasets else " "
         print(f"  [{marker}] {i}. {ds}")
     
-    print(f"\n当前选择的数据集: {', '.join(args.datasets)}")
+    print(f"\nCurrently selected dataset(s): {', '.join(args.datasets)}")
     
     train(args)
 

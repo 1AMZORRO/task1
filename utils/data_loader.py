@@ -150,20 +150,20 @@ class RNAGymDataset(Dataset):
 def load_rnagym_data(data_dir, dataset_names, tokenizer, batch_size=32, 
                      train_ratio=0.8, max_length=512, num_workers=0, normalize=True):
     """
-    加载RNAGym数据集并划分训练集和验证集
+    Load RNAGym dataset and split into training and validation sets
     
     Args:
-        data_dir: 数据目录路径
-        dataset_names: 数据集名称（CSV文件名，不含扩展名）或名称列表
-        tokenizer: RNA分词器
-        batch_size: 批次大小
-        train_ratio: 训练集比例
-        max_length: 最大序列长度
-        num_workers: 数据加载器worker数量
-        normalize: 是否标准化fitness值
+        data_dir: Data directory path
+        dataset_names: Dataset name(s) (CSV filename without extension) or list of names
+        tokenizer: RNA tokenizer
+        batch_size: Batch size
+        train_ratio: Training set ratio
+        max_length: Maximum sequence length
+        num_workers: Number of dataloader workers
+        normalize: Whether to normalize fitness values
         
     Returns:
-        train_loader, val_loader, full_dataset: 训练和验证数据加载器，以及完整数据集对象
+        train_loader, val_loader, full_dataset: Training and validation dataloaders, and full dataset object
     """
     # 支持单个数据集或多个数据集
     if isinstance(dataset_names, str):
