@@ -3,7 +3,14 @@
 """
 import torch
 import torch.nn as nn
-from mamba_ssm import Mamba
+
+# 尝试导入mamba-ssm，如果失败则使用简化版本
+try:
+    from mamba_ssm import Mamba
+    print("使用官方mamba-ssm实现")
+except ImportError:
+    from .simple_mamba import Mamba
+    print("警告: mamba-ssm未安装，使用简化版本（基于GRU）")
 
 
 class MambaBlock(nn.Module):

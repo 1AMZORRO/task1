@@ -127,7 +127,7 @@ def train(args):
     
     # 学习率调度器
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.5, patience=5, verbose=True
+        optimizer, mode='min', factor=0.5, patience=5
     )
     
     # 训练循环
@@ -190,7 +190,7 @@ def train(args):
     print("训练完成！加载最佳模型进行最终评估...")
     print(f"{'='*60}")
     
-    checkpoint = torch.load(os.path.join(args.output_dir, 'best_model.pt'))
+    checkpoint = torch.load(os.path.join(args.output_dir, 'best_model.pt'), weights_only=False)
     model.load_state_dict(checkpoint['model_state_dict'])
     
     # 最终验证
