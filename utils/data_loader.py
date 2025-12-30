@@ -68,7 +68,7 @@ class RNAGymDataset(Dataset):
             csv_files: CSV文件路径或路径列表
             tokenizer: RNA分词器
             max_length: 最大序列长度
-            normalize: 是否对fitness值进行log变换和标准化
+            normalize: 是否对fitness值进行标准化
         """
         # 支持单个文件或多个文件
         if isinstance(csv_files, str):
@@ -88,21 +88,20 @@ class RNAGymDataset(Dataset):
         self.max_length = max_length
         self.normalize = normalize
         
-        # 对fitness值进行log变换和标准化
+        # 对fitness值进行标准化（使用Z-score标准化）
         if self.normalize:
-            # log变换 (添加一个小的epsilon避免log(0))
-            self.data['fitness_log'] = np.log(self.data['DMS_score'] + 1e-10)
+            # 计算均值和标准差
+            self.fitness_mean = self.data['DMS_score'].mean()
+            self.fitness_std = self.data['DMS_score'].std()
             
-            # 计算均值和标准差用于标准化
-            self.fitness_mean = self.data['fitness_log'].mean()
-            self.fitness_std = self.data['fitness_log'].std()
-            
-            # 标准化
-            self.data['fitness_normalized'] = (self.data['fitness_log'] - self.fitness_mean) / self.fitness_std
+            # 标准化 (z-score)
+            self.data['fitness_normalized'] = (self.data['DMS_score'] - self.fitness_mean) / self.fitness_std
             
             print(f"\nFitness标准化信息:")
             print(f"  原始值范围: {self.data['DMS_score'].min():.6f} - {self.data['DMS_score'].max():.6f}")
-            print(f"  Log变换后范围: {self.data['fitness_log'].min():.2f} - {self.data['fitness_log'].max():.2f}")
+            print(f"  原始值均值: {self.fitness_mean:.6f}")
+            print(f"  原始值标准差: {self.fitness_std:.6f}")
+            print(f"  标准化后范围: {self.data['fitness_normalized'].min():.2f} - {self.data['fitness_normalized'].max():.2f}")
             print(f"  标准化后均值: {self.data['fitness_normalized'].mean():.6f}")
             print(f"  标准化后标准差: {self.data['fitness_normalized'].std():.6f}")
         
@@ -142,11 +141,8 @@ class RNAGymDataset(Dataset):
         if not self.normalize:
             return normalized_values
         
-        # 反标准化
-        log_values = normalized_values * self.fitness_std + self.fitness_mean
-        
-        # 反log变换
-        original_values = np.exp(log_values) - 1e-10
+        # 反标准化 (z-score)
+        original_values = normalized_values * self.fitness_std + self.fitness_mean
         
         return original_values
 
