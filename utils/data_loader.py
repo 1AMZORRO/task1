@@ -78,9 +78,9 @@ class RNAGymDataset(Dataset):
         all_data = []
         for csv_file in csv_files:
             df = pd.read_csv(csv_file)
-            print(f"加载数据集: {csv_file}")
-            print(f"  样本数量: {len(df)}")
-            print(f"  序列长度范围: {df['sequence'].str.len().min()} - {df['sequence'].str.len().max()}")
+            print(f"Loading dataset: {csv_file}")
+            print(f"  Number of samples: {len(df)}")
+            print(f"  Sequence length range: {df['sequence'].str.len().min()} - {df['sequence'].str.len().max()}")
             all_data.append(df)
         
         self.data = pd.concat(all_data, ignore_index=True)
@@ -97,15 +97,15 @@ class RNAGymDataset(Dataset):
             # 标准化 (z-score)
             self.data['fitness_normalized'] = (self.data['DMS_score'] - self.fitness_mean) / self.fitness_std
             
-            print(f"\nFitness标准化信息:")
-            print(f"  原始值范围: {self.data['DMS_score'].min():.6f} - {self.data['DMS_score'].max():.6f}")
-            print(f"  原始值均值: {self.fitness_mean:.6f}")
-            print(f"  原始值标准差: {self.fitness_std:.6f}")
-            print(f"  标准化后范围: {self.data['fitness_normalized'].min():.2f} - {self.data['fitness_normalized'].max():.2f}")
-            print(f"  标准化后均值: {self.data['fitness_normalized'].mean():.6f}")
-            print(f"  标准化后标准差: {self.data['fitness_normalized'].std():.6f}")
+            print(f"\nFitness normalization info:")
+            print(f"  Original value range: {self.data['DMS_score'].min():.6f} - {self.data['DMS_score'].max():.6f}")
+            print(f"  Original mean: {self.fitness_mean:.6f}")
+            print(f"  Original std: {self.fitness_std:.6f}")
+            print(f"  Normalized range: {self.data['fitness_normalized'].min():.2f} - {self.data['fitness_normalized'].max():.2f}")
+            print(f"  Normalized mean: {self.data['fitness_normalized'].mean():.6f}")
+            print(f"  Normalized std: {self.data['fitness_normalized'].std():.6f}")
         
-        print(f"\n总样本数量: {len(self.data)}")
+        print(f"\nTotal number of samples: {len(self.data)}")
         
     def __len__(self):
         return len(self.data)
@@ -185,8 +185,8 @@ def load_rnagym_data(data_dir, dataset_names, tokenizer, batch_size=32,
         generator=torch.Generator().manual_seed(42)
     )
     
-    print(f"训练集大小: {len(train_dataset)}")
-    print(f"验证集大小: {len(val_dataset)}")
+    print(f"Training set size: {len(train_dataset)}")
+    print(f"Validation set size: {len(val_dataset)}")
     
     # 创建数据加载器
     train_loader = DataLoader(

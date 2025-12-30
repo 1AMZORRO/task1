@@ -171,16 +171,16 @@ def train(args):
         train_losses.append(train_loss)
         train_metrics_history.append(train_metrics)
         
-        print(f"\n训练集 - Loss: {train_loss:.4f}")
-        print_metrics(train_metrics, prefix="训练集 ")
+        print(f"\nTraining Set - Loss: {train_loss:.4f}")
+        print_metrics(train_metrics, prefix="Training Set ")
         
         # 验证
         val_loss, val_metrics, val_targets, val_preds = validate(model, val_loader, criterion, device, dataset)
         val_losses.append(val_loss)
         val_metrics_history.append(val_metrics)
         
-        print(f"\n验证集 - Loss: {val_loss:.4f}")
-        print_metrics(val_metrics, prefix="验证集 ")
+        print(f"\nValidation Set - Loss: {val_loss:.4f}")
+        print_metrics(val_metrics, prefix="Validation Set ")
         
         # 学习率调度
         scheduler.step(val_loss)
@@ -219,7 +219,7 @@ def train(args):
     # 最终验证
     _, final_metrics, final_targets, final_preds = validate(model, val_loader, criterion, device, dataset)
     
-    print("\n最终评估结果:")
+    print("\nFinal Evaluation Results:")
     print_metrics(final_metrics)
     
     # 反标准化用于可视化

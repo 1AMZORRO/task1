@@ -19,7 +19,7 @@ from tqdm import tqdm
 def evaluate_model(model_path, data_dir, dataset_names, output_dir):
     """评估模型"""
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"使用设备: {device}")
+    print(f"Using device: {device}")
     
     # 加载checkpoint
     checkpoint = torch.load(model_path, weights_only=False, map_location=device)
@@ -78,7 +78,7 @@ def evaluate_model(model_path, data_dir, dataset_names, output_dir):
     # 计算指标
     metrics = calculate_all_metrics(all_targets_original, all_preds_original)
     
-    print("\n最终评估结果:")
+    print("\nFinal Evaluation Results:")
     print_metrics(metrics)
     
     # 保存可视化

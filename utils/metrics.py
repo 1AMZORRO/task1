@@ -124,7 +124,7 @@ def print_metrics(metrics, prefix=""):
         metrics: 指标字典
         prefix: 打印前缀
     """
-    print(f"\n{prefix}评估指标:")
-    print(f"  Spearman相关系数: {metrics['spearman']:.4f} (p={metrics['spearman_p']:.4e})")
+    print(f"\n{prefix}Evaluation Metrics:")
+    print(f"  Spearman Correlation: {metrics['spearman']:.4f} (p={metrics['spearman_p']:.4e})")
     print(f"  AUC: {metrics['auc']:.4f}")
     print(f"  MCC: {metrics['mcc']:.4f}")
