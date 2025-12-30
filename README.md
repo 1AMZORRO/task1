@@ -1,258 +1,169 @@
-# RNA Fitness预测框架
+# RNA Fitness 预测项目
 
-基于Mamba SSM模型的RNA fitness预测框架，参照[RNAGym](https://github.com/MarksLab-DasLab/RNAGym)标准实现。
+基于 Mamba SSM 的 RNA 适应性（Fitness）预测模型。
 
 ## 项目简介
 
-本项目实现了一个用于RNA适应性（fitness）预测的深度学习框架，核心模型采用Mamba状态空间模型（SSM）。Mamba模型是一种高效的序列建模架构，特别适合处理RNA这类长序列数据。
+本项目使用 Mamba 状态空间模型（SSM）作为核心架构，实现对 RNA 序列适应性的预测。项目参照 [RNAGym](https://github.com/MarksLab-DasLab/RNAGym) 的任务定义、数据集和评分标准。
 
-### 主要特性
+## 特性
 
-- ✅ **Mamba SSM模型**: 使用先进的状态空间模型进行序列建模
-- ✅ **RNAGym标准**: 遵循RNAGym的任务定义和评估指标
-- ✅ **完整的训练流程**: 包含数据处理、模型训练、评估等完整pipeline
-- ✅ **灵活的配置**: 通过YAML配置文件轻松调整模型和训练参数
-- ✅ **详细的评估指标**: 提供MSE、R²、Spearman相关系数等多种评估指标
+- ✅ 基于 Mamba SSM 的深度学习模型
+- ✅ 支持 GPU 加速训练
+- ✅ 完整的训练和验证流程
+- ✅ 多种评估指标：Spearman 相关系数、AUC、MCC
+- ✅ 训练过程可视化
+- ✅ 预测结果可视化
 
 ## 项目结构
 
 ```
-task1/
-├── rna_fitness/              # 核心模块
-│   ├── models/               # 模型实现
-│   │   ├── __init__.py
-│   │   └── mamba_rna.py     # Mamba RNA模型
-│   ├── data/                 # 数据处理
-│   │   ├── __init__.py
-│   │   └── dataset.py       # 数据集类
-│   ├── utils/                # 工具函数
-│   │   ├── __init__.py
-│   │   ├── tokenizer.py     # RNA序列tokenizer
-│   │   └── metrics.py       # 评估指标
-│   └── configs/              # 配置文件
-│       └── default_config.yaml
-├── examples/                 # 示例代码
-│   └── quick_start.py       # 快速开始示例
-├── tests/                    # 测试代码
-│   ├── test_tokenizer.py
-│   ├── test_model.py
-│   └── test_dataset.py
-├── train.py                  # 训练脚本
-├── evaluate.py               # 评估脚本
-├── requirements.txt          # 依赖
-├── setup.py                  # 安装配置
-└── README.md                 # 本文件
+.
+├── data/
+│   └── RNAGym/          # RNA 数据集（CSV 格式）
+├── models/
+│   └── mamba_rna.py     # Mamba SSM 模型定义
+├── utils/
+│   ├── data_loader.py   # 数据加载和预处理
+│   ├── metrics.py       # 评估指标计算
+│   └── visualization.py # 可视化工具
+├── train.py             # 训练脚本
+├── requirements.txt     # 依赖包列表
+└── README.md           # 项目说明
 ```
 
-## 安装
-
-### 环境要求
-
-- Python >= 3.8
-- PyTorch >= 2.0.0
-- CUDA (可选，用于GPU加速)
-
-### 安装依赖
+## 安装依赖
 
 ```bash
-# 克隆仓库
-git clone https://github.com/1AMZORRO/task1.git
-cd task1
-
-# 安装依赖
 pip install -r requirements.txt
-
-# 安装本项目
-pip install -e .
 ```
 
-### Mamba SSM安装（可选）
+主要依赖：
+- PyTorch >= 2.0.0
+- mamba-ssm >= 1.0.0
+- scikit-learn
+- pandas
+- matplotlib
 
-如果要使用真正的Mamba模型（而不是LSTM备选），需要额外安装：
+## 数据集
+
+项目使用 RNAGym 数据集，数据格式为 CSV 文件，包含以下列：
+- `mutant`: 突变信息
+- `DMS_score`: 适应性得分（目标值）
+- `sequence`: RNA 序列
+
+可用数据集位于 `data/RNAGym/` 目录下。
+
+## 使用方法
+
+### 基础训练
 
 ```bash
-pip install mamba-ssm causal-conv1d
+python train.py --dataset Andreasson_2020_ribozyme --epochs 50
 ```
 
-注意：Mamba SSM的安装可能需要编译，请确保有合适的编译环境。
-
-## 快速开始
-
-### 1. 运行示例代码
-
-```bash
-python examples/quick_start.py
-```
-
-这将展示：
-- RNA序列的编码和解码
-- 模型推理
-- 数据集的使用
-- 简单的训练循环
-
-### 2. 训练模型
-
-使用示例数据训练：
-
-```bash
-python train.py --config rna_fitness/configs/default_config.yaml
-```
-
-使用自己的数据训练：
+### 自定义参数训练
 
 ```bash
 python train.py \
-    --config rna_fitness/configs/default_config.yaml \
-    --train_data path/to/train.csv \
-    --val_data path/to/val.csv \
-    --test_data path/to/test.csv
+    --dataset Andreasson_2020_ribozyme \
+    --batch_size 32 \
+    --epochs 50 \
+    --learning_rate 1e-4 \
+    --d_model 256 \
+    --n_layers 4 \
+    --output_dir outputs
 ```
 
-数据格式要求（CSV文件）：
-```csv
-sequence,fitness
-AUGCAUGCAUGC,0.5
-UUUUAAAACCCC,0.8
-GGGGUUUUCCCC,0.3
-```
+### 主要参数说明
 
-### 3. 评估模型
+**数据参数：**
+- `--data_dir`: 数据目录路径（默认：`data/RNAGym`）
+- `--dataset`: 数据集名称（默认：`Andreasson_2020_ribozyme`）
+- `--max_length`: 最大序列长度（默认：512）
+- `--train_ratio`: 训练集比例（默认：0.8）
 
-```bash
-python evaluate.py \
-    --checkpoint checkpoints/best_model.pt \
-    --test_data path/to/test.csv \
-    --output predictions.csv
-```
+**模型参数：**
+- `--d_model`: 模型维度（默认：256）
+- `--n_layers`: Mamba 层数（默认：4）
+- `--d_state`: SSM 状态维度（默认：16）
+- `--dropout`: Dropout 率（默认：0.1）
 
-## 配置说明
+**训练参数：**
+- `--batch_size`: 批次大小（默认：32）
+- `--epochs`: 训练轮数（默认：50）
+- `--learning_rate`: 学习率（默认：1e-4）
+- `--output_dir`: 输出目录（默认：`outputs`）
 
-配置文件位于`rna_fitness/configs/default_config.yaml`，主要配置项：
+## 输出结果
 
-### 模型配置
-```yaml
-model:
-  vocab_size: 8      # 词汇表大小
-  d_model: 256       # 模型维度
-  n_layers: 4        # 层数
-  d_state: 16        # 状态空间维度
-  dropout: 0.1       # Dropout率
-  use_mamba: true    # 是否使用Mamba（false使用LSTM）
-```
+训练完成后，会在输出目录中生成以下文件：
 
-### 训练配置
-```yaml
-training:
-  num_epochs: 100              # 训练轮数
-  learning_rate: 0.001         # 学习率
-  batch_size: 32               # 批次大小
-  early_stopping_patience: 10  # 早停耐心值
-```
-
-## API使用
-
-### Tokenizer
-
-```python
-from rna_fitness import RNATokenizer
-
-# 初始化
-tokenizer = RNATokenizer()
-
-# 编码单个序列
-encoded = tokenizer.encode("AUGCAUGC", max_length=20)
-
-# 批量编码
-batch = tokenizer.batch_encode(["AUGC", "UUUU"], max_length=20)
-
-# 解码
-decoded = tokenizer.decode(encoded[0])
-```
-
-### 模型
-
-```python
-from rna_fitness import MambaRNA
-import torch
-
-# 初始化模型
-model = MambaRNA(
-    vocab_size=8,
-    d_model=256,
-    n_layers=4
-)
-
-# 推理
-input_ids = torch.randint(0, 8, (2, 20))
-attention_mask = torch.ones(2, 20)
-predictions = model(input_ids, attention_mask)
-```
-
-### 数据集
-
-```python
-from rna_fitness import RNADataset, RNATokenizer
-
-tokenizer = RNATokenizer()
-
-# 创建数据集
-dataset = RNADataset(
-    sequences=['AUGC', 'UUUU'],
-    fitness=[0.5, 0.8],
-    tokenizer=tokenizer,
-    max_length=20
-)
-
-# 获取样本
-sample = dataset[0]
-```
+1. **best_model.pt**: 最佳模型检查点
+2. **training_curves.png**: 训练曲线图
+   - 损失曲线
+   - Spearman 相关系数
+   - AUC 分数
+   - MCC 分数
+   - RMSE 和 MAE
+3. **prediction_scatter.png**: 预测值 vs 真实值散点图
+4. **results_summary.txt**: 评估结果摘要
 
 ## 评估指标
 
-根据RNAGym标准，本框架提供以下评估指标：
+- **Spearman 相关系数**: 衡量预测值与真实值的单调相关性
+- **AUC (Area Under ROC Curve)**: 二分类性能指标
+- **MCC (Matthews Correlation Coefficient)**: 二分类质量指标
+- **RMSE (Root Mean Square Error)**: 回归误差
+- **MAE (Mean Absolute Error)**: 平均绝对误差
 
-### RNAGym标准指标（主要）
+## 模型架构
 
-- **Spearman相关系数（绝对值）**: 秩相关系数，用于衡量预测值和真实值的单调关系
-- **AUC**: 基于中位数阈值的ROC曲线下面积，评估二分类性能
-- **MCC（绝对值）**: Matthews相关系数，评估二分类预测质量
+模型采用 Mamba SSM 作为核心模块：
 
-### 额外提供的指标
+1. **Token 嵌入层**: 将 RNA 碱基（A, U, G, C）转换为向量表示
+2. **Mamba 层堆叠**: 多层 Mamba SSM 块，捕获序列依赖关系
+3. **回归头**: 预测适应性得分
 
-- **MSE**: 均方误差
-- **RMSE**: 均方根误差
-- **R²**: 决定系数
-- **Pearson相关系数**: 线性相关系数
+Mamba SSM 的优势：
+- 长序列建模能力强
+- 计算效率高于 Transformer
+- 对位置信息敏感
 
-这些指标与RNAGym论文中使用的评估标准完全一致。
+## GPU 使用
 
-## 测试
+训练脚本会自动检测并使用可用的 GPU。如果没有 GPU，会自动使用 CPU。
 
-运行测试：
+查看 GPU 使用情况：
+```bash
+nvidia-smi
+```
+
+## 示例：快速开始
 
 ```bash
-# 运行所有测试
-pytest tests/ -v
+# 1. 安装依赖
+pip install -r requirements.txt
 
-# 运行特定测试
-pytest tests/test_tokenizer.py -v
-pytest tests/test_model.py -v
-pytest tests/test_dataset.py -v
+# 2. 训练模型（使用默认数据集）
+python train.py --epochs 30 --batch_size 32
+
+# 3. 查看结果
+ls outputs/
 ```
+
+## 注意事项
+
+1. 首次安装 `mamba-ssm` 可能需要编译，请确保安装了正确的 CUDA 版本
+2. 训练时建议使用 GPU 以加快速度
+3. 不同数据集的序列长度不同，可能需要调整 `--max_length` 参数
+4. 如果遇到内存不足，可以减小 `--batch_size` 或 `--d_model`
 
 ## 参考
 
-- [RNAGym](https://github.com/MarksLab-DasLab/RNAGym): RNA适应性预测基准
-- [Mamba SSM](https://github.com/state-spaces/mamba): 状态空间模型
+- [Mamba: Linear-Time Sequence Modeling with Selective State Spaces](https://arxiv.org/abs/2312.00752)
+- [RNAGym: A Platform for RNA Fitness Prediction](https://github.com/MarksLab-DasLab/RNAGym)
 
-## 许可证
+## 许可
 
 MIT License
-
-## 贡献
-
-欢迎提交Issue和Pull Request！
-
-## 联系方式
-
-如有问题，请通过Issue联系。
