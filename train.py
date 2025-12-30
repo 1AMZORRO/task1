@@ -1,5 +1,5 @@
 """
-RNA Fitness预测模型训练脚本
+RNA Fitness Prediction Model Training Script
 """
 import os
 import argparse
@@ -104,21 +104,21 @@ def validate(model, val_loader, criterion, device, dataset=None):
 
 
 def train(args):
-    """主训练函数"""
-    # 设置设备
+    """Main training function"""
+    # Setup device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"使用设备: {device}")
+    print(f"Using device: {device}")
     if torch.cuda.is_available():
         print(f"GPU: {torch.cuda.get_device_name(0)}")
     
-    # 创建输出目录
+    # Create output directory
     os.makedirs(args.output_dir, exist_ok=True)
     
-    # 初始化tokenizer
+    # Initialize tokenizer
     tokenizer = RNATokenizer()
     
-    # 加载数据
-    print(f"\n加载数据集: {args.datasets}")
+    # Load data
+    print(f"\nLoading dataset(s): {args.datasets}")
     train_loader, val_loader, dataset = load_rnagym_data(
         data_dir=args.data_dir,
         dataset_names=args.datasets,
@@ -127,11 +127,11 @@ def train(args):
         train_ratio=args.train_ratio,
         max_length=args.max_length,
         num_workers=args.num_workers,
-        normalize=True  # 启用标准化
+        normalize=True  # Enable normalization
     )
     
-    # 创建模型
-    print("\n创建模型...")
+    # Create model
+    print("\nCreating model...")
     model_config = {
         'vocab_size': 8,
         'd_model': args.d_model,
@@ -144,17 +144,17 @@ def train(args):
     model = create_model(model_config)
     model = model.to(device)
     
-    # 损失函数和优化器
+    # Loss function and optimizer
     criterion = nn.MSELoss()
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
     
-    # 学习率调度器
+    # Learning rate scheduler
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode='min', factor=0.5, patience=5
     )
     
-    # 训练循环
-    print(f"\n开始训练 {args.epochs} 个epoch...")
+    # Training loop
+    print(f"\nStarting training for {args.epochs} epochs...")
     best_val_loss = float('inf')
     train_losses = []
     val_losses = []
@@ -166,7 +166,7 @@ def train(args):
         print(f"Epoch {epoch}/{args.epochs}")
         print(f"{'='*60}")
         
-        # 训练
+        # Training
         train_loss, train_metrics = train_epoch(model, train_loader, criterion, optimizer, device, dataset)
         train_losses.append(train_loss)
         train_metrics_history.append(train_metrics)
@@ -174,7 +174,7 @@ def train(args):
         print(f"\nTraining Set - Loss: {train_loss:.4f}")
         print_metrics(train_metrics, prefix="Training Set ")
         
-        # 验证
+        # Validation
         val_loss, val_metrics, val_targets, val_preds = validate(model, val_loader, criterion, device, dataset)
         val_losses.append(val_loss)
         val_metrics_history.append(val_metrics)
@@ -182,10 +182,10 @@ def train(args):
         print(f"\nValidation Set - Loss: {val_loss:.4f}")
         print_metrics(val_metrics, prefix="Validation Set ")
         
-        # 学习率调度
+        # Learning rate scheduling
         scheduler.step(val_loss)
         
-        # 保存最佳模型
+        # Save best model
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             model_path = os.path.join(args.output_dir, 'best_model.pt')
@@ -197,9 +197,9 @@ def train(args):
                 'val_metrics': val_metrics,
                 'model_config': model_config
             }, model_path)
-            print(f"\n✓ 保存最佳模型到: {model_path}")
+            print(f"\n✓ Saved best model to: {model_path}")
         
-        # 绘制训练曲线
+        # Plot training curves
         if epoch % args.plot_interval == 0 or epoch == args.epochs:
             plot_path = os.path.join(args.output_dir, 'training_curves.png')
             plot_training_curves(
@@ -208,21 +208,21 @@ def train(args):
                 save_path=plot_path
             )
     
-    # 训练结束，加载最佳模型进行最终评估
+    # Training complete, load best model for final evaluation
     print(f"\n{'='*60}")
-    print("训练完成！加载最佳模型进行最终评估...")
+    print("Training complete! Loading best model for final evaluation...")
     print(f"{'='*60}")
     
     checkpoint = torch.load(os.path.join(args.output_dir, 'best_model.pt'), weights_only=False)
     model.load_state_dict(checkpoint['model_state_dict'])
     
-    # 最终验证
+    # Final validation
     _, final_metrics, final_targets, final_preds = validate(model, val_loader, criterion, device, dataset)
     
     print("\nFinal Evaluation Results:")
     print_metrics(final_metrics)
     
-    # 反标准化用于可视化
+    # Denormalize for visualization
     if dataset.normalize:
         final_targets_original = dataset.denormalize(final_targets)
         final_preds_original = dataset.denormalize(final_preds)
@@ -230,15 +230,15 @@ def train(args):
         final_targets_original = final_targets
         final_preds_original = final_preds
     
-    # 保存预测散点图
+    # Save prediction scatter plot
     scatter_path = os.path.join(args.output_dir, 'prediction_scatter.png')
     plot_prediction_scatter(final_targets_original, final_preds_original, final_metrics, save_path=scatter_path)
     
-    # 保存结果摘要
+    # Save results summary
     summary_path = os.path.join(args.output_dir, 'results_summary.txt')
     save_results_summary(final_metrics, save_path=summary_path)
     
-    print(f"\n训练完成！所有结果已保存到: {args.output_dir}")
+    print(f"\nTraining complete! All results saved to: {args.output_dir}")
 
 
 def main():

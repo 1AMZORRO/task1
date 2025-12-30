@@ -1,5 +1,5 @@
 """
-评估训练好的模型
+Evaluate trained model
 """
 import torch
 import sys
@@ -21,21 +21,21 @@ def evaluate_model(model_path, data_dir, dataset_names, output_dir):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
-    # 加载checkpoint
+    # Load checkpoint
     checkpoint = torch.load(model_path, weights_only=False, map_location=device)
     model_config = checkpoint['model_config']
     
-    # 创建模型
+    # Create model
     model = create_model(model_config)
     model.load_state_dict(checkpoint['model_state_dict'])
     model = model.to(device)
     model.eval()
     
-    print(f"\n加载模型: {model_path}")
+    print(f"\nLoaded model: {model_path}")
     print(f"Best epoch: {checkpoint['epoch']}")
     print(f"Best val loss: {checkpoint['val_loss']:.6f}")
     
-    # 加载数据
+    # Load data
     tokenizer = RNATokenizer()
     train_loader, val_loader, dataset = load_rnagym_data(
         data_dir=data_dir,
@@ -48,13 +48,13 @@ def evaluate_model(model_path, data_dir, dataset_names, output_dir):
         normalize=True
     )
     
-    # 评估
-    print("\n开始评估...")
+    # Evaluate
+    print("\nStarting evaluation...")
     all_preds = []
     all_targets = []
     
     with torch.no_grad():
-        pbar = tqdm(val_loader, desc='评估中')
+        pbar = tqdm(val_loader, desc='Evaluating')
         for batch in pbar:
             input_ids = batch['input_ids'].to(device)
             targets = batch['fitness'].to(device)
@@ -67,7 +67,7 @@ def evaluate_model(model_path, data_dir, dataset_names, output_dir):
     all_preds = np.array(all_preds)
     all_targets = np.array(all_targets)
     
-    # 反标准化
+    # Denormalize
     if dataset.normalize:
         all_preds_original = dataset.denormalize(all_preds)
         all_targets_original = dataset.denormalize(all_targets)
@@ -75,22 +75,22 @@ def evaluate_model(model_path, data_dir, dataset_names, output_dir):
         all_preds_original = all_preds
         all_targets_original = all_targets
     
-    # 计算指标
+    # Calculate metrics
     metrics = calculate_all_metrics(all_targets_original, all_preds_original)
     
     print("\nFinal Evaluation Results:")
     print_metrics(metrics)
     
-    # 保存可视化
+    # Save visualization
     os.makedirs(output_dir, exist_ok=True)
     scatter_path = os.path.join(output_dir, 'prediction_scatter.png')
     plot_prediction_scatter(all_targets_original, all_preds_original, metrics, save_path=scatter_path)
     
-    # 保存结果摘要
+    # Save results summary
     summary_path = os.path.join(output_dir, 'results_summary.txt')
     save_results_summary(metrics, save_path=summary_path)
     
-    print(f"\n所有结果已保存到: {output_dir}")
+    print(f"\nAll results saved to: {output_dir}")
 
 
 if __name__ == '__main__':
