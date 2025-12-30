@@ -1,289 +1,272 @@
 """
-训练脚本
-使用Mamba模型训练RNA fitness预测
+RNA Fitness预测模型训练脚本
 """
-
 import os
-import yaml
 import argparse
-import random
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+import numpy as np
 
-from rna_fitness import MambaRNA, RNADataset, RNATokenizer
-from rna_fitness.data import create_dataloaders
-from rna_fitness.utils.metrics import compute_metrics, print_metrics
-
-
-def set_seed(seed):
-    """设置随机种子以保证可复现性"""
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
+from models.mamba_rna import create_model
+from utils.data_loader import RNATokenizer, load_rnagym_data, get_available_datasets
+from utils.metrics import calculate_all_metrics, print_metrics
+from utils.visualization import plot_training_curves, plot_prediction_scatter, save_results_summary
 
 
-def load_config(config_path):
-    """加载配置文件"""
-    with open(config_path, 'r', encoding='utf-8') as f:
-        config = yaml.safe_load(f)
-    return config
-
-
-def train_epoch(model, train_loader, criterion, optimizer, device, epoch):
+def train_epoch(model, train_loader, criterion, optimizer, device):
     """训练一个epoch"""
     model.train()
     total_loss = 0
-    predictions_list = []
-    labels_list = []
+    all_preds = []
+    all_targets = []
     
-    pbar = tqdm(train_loader, desc=f"Epoch {epoch} [训练]")
+    pbar = tqdm(train_loader, desc='训练中')
     for batch in pbar:
         input_ids = batch['input_ids'].to(device)
-        attention_mask = batch['attention_mask'].to(device)
-        labels = batch['labels'].to(device)
+        targets = batch['fitness'].to(device)
         
         # 前向传播
         optimizer.zero_grad()
-        outputs = model(input_ids, attention_mask)
-        loss = criterion(outputs, labels)
+        predictions = model(input_ids)
+        
+        # 计算损失
+        loss = criterion(predictions, targets)
         
         # 反向传播
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
         
-        # 记录
         total_loss += loss.item()
-        predictions_list.extend(outputs.detach().cpu().numpy())
-        labels_list.extend(labels.detach().cpu().numpy())
+        all_preds.extend(predictions.detach().cpu().numpy())
+        all_targets.extend(targets.detach().cpu().numpy())
         
         pbar.set_postfix({'loss': f'{loss.item():.4f}'})
     
     avg_loss = total_loss / len(train_loader)
-    metrics = compute_metrics(predictions_list, labels_list)
-    metrics['loss'] = avg_loss
+    metrics = calculate_all_metrics(all_targets, all_preds)
     
-    return metrics
+    return avg_loss, metrics
 
 
-def evaluate(model, data_loader, criterion, device, desc="验证"):
-    """评估模型"""
+def validate(model, val_loader, criterion, device):
+    """验证模型"""
     model.eval()
     total_loss = 0
-    predictions_list = []
-    labels_list = []
+    all_preds = []
+    all_targets = []
     
     with torch.no_grad():
-        pbar = tqdm(data_loader, desc=desc)
+        pbar = tqdm(val_loader, desc='验证中')
         for batch in pbar:
             input_ids = batch['input_ids'].to(device)
-            attention_mask = batch['attention_mask'].to(device)
-            labels = batch['labels'].to(device)
+            targets = batch['fitness'].to(device)
             
             # 前向传播
-            outputs = model(input_ids, attention_mask)
-            loss = criterion(outputs, labels)
+            predictions = model(input_ids)
             
-            # 记录
+            # 计算损失
+            loss = criterion(predictions, targets)
+            
             total_loss += loss.item()
-            predictions_list.extend(outputs.cpu().numpy())
-            labels_list.extend(labels.cpu().numpy())
+            all_preds.extend(predictions.cpu().numpy())
+            all_targets.extend(targets.cpu().numpy())
             
             pbar.set_postfix({'loss': f'{loss.item():.4f}'})
     
-    avg_loss = total_loss / len(data_loader)
-    metrics = compute_metrics(predictions_list, labels_list)
-    metrics['loss'] = avg_loss
+    avg_loss = total_loss / len(val_loader)
+    metrics = calculate_all_metrics(all_targets, all_preds)
     
-    return metrics
+    return avg_loss, metrics, np.array(all_targets), np.array(all_preds)
 
 
-def main():
-    parser = argparse.ArgumentParser(description='训练RNA fitness预测模型')
-    parser.add_argument('--config', type=str, default='rna_fitness/configs/default_config.yaml',
-                        help='配置文件路径')
-    parser.add_argument('--train_data', type=str, default=None,
-                        help='训练数据路径')
-    parser.add_argument('--val_data', type=str, default=None,
-                        help='验证数据路径')
-    parser.add_argument('--test_data', type=str, default=None,
-                        help='测试数据路径')
-    args = parser.parse_args()
-    
-    # 加载配置
-    print("加载配置文件...")
-    config = load_config(args.config)
-    
-    # 设置随机种子
-    set_seed(config['seed'])
-    
+def train(args):
+    """主训练函数"""
     # 设置设备
-    device = torch.device('cuda' if torch.cuda.is_available() and config['device']['cuda'] else 'cpu')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"使用设备: {device}")
+    if torch.cuda.is_available():
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
     
     # 创建输出目录
-    os.makedirs(config['output']['log_dir'], exist_ok=True)
-    os.makedirs(config['output']['checkpoint_dir'], exist_ok=True)
-    os.makedirs(config['output']['result_dir'], exist_ok=True)
+    os.makedirs(args.output_dir, exist_ok=True)
     
     # 初始化tokenizer
-    print("初始化tokenizer...")
     tokenizer = RNATokenizer()
     
     # 加载数据
-    print("加载数据...")
-    train_data_path = args.train_data or config['data'].get('train_path')
-    val_data_path = args.val_data or config['data'].get('val_path')
-    test_data_path = args.test_data or config['data'].get('test_path')
+    print(f"\n加载数据集: {args.dataset}")
+    train_loader, val_loader = load_rnagym_data(
+        data_dir=args.data_dir,
+        dataset_name=args.dataset,
+        tokenizer=tokenizer,
+        batch_size=args.batch_size,
+        train_ratio=args.train_ratio,
+        max_length=args.max_length,
+        num_workers=args.num_workers
+    )
     
-    if train_data_path is None:
-        print("警告: 未提供训练数据，使用示例数据进行演示")
-        # 创建示例数据
-        train_sequences = ['AUGC' * 10 for _ in range(100)]
-        train_fitness = np.random.randn(100).tolist()
-        val_sequences = ['AUGC' * 10 for _ in range(20)]
-        val_fitness = np.random.randn(20).tolist()
-        
-        train_loader, val_loader, test_loader = create_dataloaders(
-            train_sequences=train_sequences,
-            train_fitness=train_fitness,
-            val_sequences=val_sequences,
-            val_fitness=val_fitness,
-            tokenizer=tokenizer,
-            batch_size=config['data']['batch_size'],
-            max_length=config['data']['max_length'],
-            num_workers=0  # 示例数据使用0个worker
-        )
-    else:
-        train_loader, val_loader, test_loader = create_dataloaders(
-            train_data_path=train_data_path,
-            val_data_path=val_data_path,
-            test_data_path=test_data_path,
-            tokenizer=tokenizer,
-            batch_size=config['data']['batch_size'],
-            max_length=config['data']['max_length'],
-            num_workers=config['data']['num_workers']
-        )
-    
-    # 初始化模型
-    print("初始化模型...")
-    model = MambaRNA(
-        vocab_size=config['model']['vocab_size'],
-        d_model=config['model']['d_model'],
-        n_layers=config['model']['n_layers'],
-        d_state=config['model']['d_state'],
-        d_conv=config['model']['d_conv'],
-        expand=config['model']['expand'],
-        dropout=config['model']['dropout'],
-        use_mamba=config['model']['use_mamba']
-    ).to(device)
-    
-    print(f"模型参数量: {sum(p.numel() for p in model.parameters()):,}")
+    # 创建模型
+    print("\n创建模型...")
+    model_config = {
+        'vocab_size': 8,
+        'd_model': args.d_model,
+        'n_layers': args.n_layers,
+        'd_state': args.d_state,
+        'd_conv': args.d_conv,
+        'expand': args.expand,
+        'dropout': args.dropout
+    }
+    model = create_model(model_config)
+    model = model.to(device)
     
     # 损失函数和优化器
     criterion = nn.MSELoss()
-    optimizer = optim.AdamW(
-        model.parameters(),
-        lr=config['training']['learning_rate'],
-        weight_decay=config['training']['weight_decay']
+    optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
+    
+    # 学习率调度器
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=0.5, patience=5
     )
     
-    # TensorBoard
-    writer = None
-    if config['output']['use_tensorboard']:
-        writer = SummaryWriter(config['output']['log_dir'])
-    
     # 训练循环
-    print("\n开始训练...")
+    print(f"\n开始训练 {args.epochs} 个epoch...")
     best_val_loss = float('inf')
-    patience_counter = 0
+    train_losses = []
+    val_losses = []
+    train_metrics_history = []
+    val_metrics_history = []
     
-    for epoch in range(1, config['training']['num_epochs'] + 1):
-        # 训练
-        train_metrics = train_epoch(model, train_loader, criterion, optimizer, device, epoch)
-        print(f"\nEpoch {epoch} - 训练集:")
-        print_metrics(train_metrics, prefix="  ")
+    for epoch in range(1, args.epochs + 1):
+        print(f"\n{'='*60}")
+        print(f"Epoch {epoch}/{args.epochs}")
+        print(f"{'='*60}")
         
-        if writer:
-            for key, value in train_metrics.items():
-                writer.add_scalar(f'train/{key}', value, epoch)
+        # 训练
+        train_loss, train_metrics = train_epoch(model, train_loader, criterion, optimizer, device)
+        train_losses.append(train_loss)
+        train_metrics_history.append(train_metrics)
+        
+        print(f"\n训练集 - Loss: {train_loss:.4f}")
+        print_metrics(train_metrics, prefix="训练集 ")
         
         # 验证
-        if val_loader and epoch % config['training']['eval_every'] == 0:
-            val_metrics = evaluate(model, val_loader, criterion, device, desc="验证")
-            print(f"\nEpoch {epoch} - 验证集:")
-            print_metrics(val_metrics, prefix="  ")
-            
-            if writer:
-                for key, value in val_metrics.items():
-                    writer.add_scalar(f'val/{key}', value, epoch)
-            
-            # 早停和模型保存
-            if val_metrics['loss'] < best_val_loss:
-                best_val_loss = val_metrics['loss']
-                patience_counter = 0
-                
-                # 保存最佳模型
-                checkpoint_path = os.path.join(
-                    config['output']['checkpoint_dir'],
-                    'best_model.pt'
-                )
-                torch.save({
-                    'epoch': epoch,
-                    'model_state_dict': model.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'val_loss': best_val_loss,
-                    'config': config
-                }, checkpoint_path)
-                print(f"  保存最佳模型到: {checkpoint_path}")
-            else:
-                patience_counter += 1
-                
-            if patience_counter >= config['training']['early_stopping_patience']:
-                print(f"\n早停触发！验证损失已经{patience_counter}个epoch没有改善。")
-                break
+        val_loss, val_metrics, val_targets, val_preds = validate(model, val_loader, criterion, device)
+        val_losses.append(val_loss)
+        val_metrics_history.append(val_metrics)
         
-        # 定期保存检查点
-        if epoch % config['training']['save_every'] == 0:
-            checkpoint_path = os.path.join(
-                config['output']['checkpoint_dir'],
-                f'checkpoint_epoch_{epoch}.pt'
-            )
+        print(f"\n验证集 - Loss: {val_loss:.4f}")
+        print_metrics(val_metrics, prefix="验证集 ")
+        
+        # 学习率调度
+        scheduler.step(val_loss)
+        
+        # 保存最佳模型
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            model_path = os.path.join(args.output_dir, 'best_model.pt')
             torch.save({
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
-                'config': config
-            }, checkpoint_path)
-    
-    # 测试
-    if test_loader:
-        print("\n在测试集上评估...")
-        # 加载最佳模型
-        checkpoint_path = os.path.join(config['output']['checkpoint_dir'], 'best_model.pt')
-        if os.path.exists(checkpoint_path):
-            checkpoint = torch.load(checkpoint_path)
-            model.load_state_dict(checkpoint['model_state_dict'])
-            print(f"加载最佳模型 (epoch {checkpoint['epoch']})")
+                'val_loss': val_loss,
+                'val_metrics': val_metrics,
+                'model_config': model_config
+            }, model_path)
+            print(f"\n✓ 保存最佳模型到: {model_path}")
         
-        test_metrics = evaluate(model, test_loader, criterion, device, desc="测试")
-        print("\n测试集结果:")
-        print_metrics(test_metrics)
-        
-        if writer:
-            for key, value in test_metrics.items():
-                writer.add_scalar(f'test/{key}', value, 0)
+        # 绘制训练曲线
+        if epoch % args.plot_interval == 0 or epoch == args.epochs:
+            plot_path = os.path.join(args.output_dir, 'training_curves.png')
+            plot_training_curves(
+                train_losses, val_losses,
+                train_metrics_history, val_metrics_history,
+                save_path=plot_path
+            )
     
-    if writer:
-        writer.close()
+    # 训练结束，加载最佳模型进行最终评估
+    print(f"\n{'='*60}")
+    print("训练完成！加载最佳模型进行最终评估...")
+    print(f"{'='*60}")
     
-    print("\n训练完成！")
+    checkpoint = torch.load(os.path.join(args.output_dir, 'best_model.pt'), weights_only=False)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    
+    # 最终验证
+    _, final_metrics, final_targets, final_preds = validate(model, val_loader, criterion, device)
+    
+    print("\n最终评估结果:")
+    print_metrics(final_metrics)
+    
+    # 保存预测散点图
+    scatter_path = os.path.join(args.output_dir, 'prediction_scatter.png')
+    plot_prediction_scatter(final_targets, final_preds, final_metrics, save_path=scatter_path)
+    
+    # 保存结果摘要
+    summary_path = os.path.join(args.output_dir, 'results_summary.txt')
+    save_results_summary(final_metrics, save_path=summary_path)
+    
+    print(f"\n训练完成！所有结果已保存到: {args.output_dir}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description='RNA Fitness预测模型训练')
+    
+    # 数据参数
+    parser.add_argument('--data_dir', type=str, default='data/RNAGym',
+                        help='数据目录路径')
+    parser.add_argument('--dataset', type=str, default='Andreasson_2020_ribozyme',
+                        help='数据集名称')
+    parser.add_argument('--max_length', type=int, default=512,
+                        help='最大序列长度')
+    parser.add_argument('--train_ratio', type=float, default=0.8,
+                        help='训练集比例')
+    
+    # 模型参数
+    parser.add_argument('--d_model', type=int, default=256,
+                        help='模型维度')
+    parser.add_argument('--n_layers', type=int, default=4,
+                        help='Mamba层数')
+    parser.add_argument('--d_state', type=int, default=16,
+                        help='SSM状态维度')
+    parser.add_argument('--d_conv', type=int, default=4,
+                        help='卷积核大小')
+    parser.add_argument('--expand', type=int, default=2,
+                        help='扩展因子')
+    parser.add_argument('--dropout', type=float, default=0.1,
+                        help='Dropout率')
+    
+    # 训练参数
+    parser.add_argument('--batch_size', type=int, default=32,
+                        help='批次大小')
+    parser.add_argument('--epochs', type=int, default=50,
+                        help='训练轮数')
+    parser.add_argument('--learning_rate', type=float, default=1e-4,
+                        help='学习率')
+    parser.add_argument('--weight_decay', type=float, default=0.01,
+                        help='权重衰减')
+    parser.add_argument('--num_workers', type=int, default=0,
+                        help='数据加载worker数量')
+    
+    # 输出参数
+    parser.add_argument('--output_dir', type=str, default='outputs',
+                        help='输出目录')
+    parser.add_argument('--plot_interval', type=int, default=5,
+                        help='绘图间隔(epoch)')
+    
+    args = parser.parse_args()
+    
+    # 显示可用数据集
+    print("\n可用的数据集:")
+    datasets = get_available_datasets(args.data_dir)
+    for i, ds in enumerate(datasets, 1):
+        marker = "✓" if ds == args.dataset else " "
+        print(f"  [{marker}] {i}. {ds}")
+    
+    print(f"\n当前选择的数据集: {args.dataset}")
+    
+    train(args)
 
 
 if __name__ == '__main__':

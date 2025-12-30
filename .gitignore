@@ -53,17 +53,18 @@ logs/
 checkpoints/
 results/
 predictions.csv
+outputs/
+outputs_test/
 
 # TensorBoard
 runs/
 events.out.tfevents.*
 
-# 数据文件
-*.csv
+# 数据文件（但保留data/RNAGym目录）
+*.csv.bak
 *.tsv
 *.h5
 *.hdf5
-data/
 
 # 模型文件
 *.pt
