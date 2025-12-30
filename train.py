@@ -96,10 +96,10 @@ def train(args):
     tokenizer = RNATokenizer()
     
     # 加载数据
-    print(f"\n加载数据集: {args.dataset}")
+    print(f"\n加载数据集: {args.datasets}")
     train_loader, val_loader = load_rnagym_data(
         data_dir=args.data_dir,
-        dataset_name=args.dataset,
+        dataset_names=args.datasets,
         tokenizer=tokenizer,
         batch_size=args.batch_size,
         train_ratio=args.train_ratio,
@@ -216,8 +216,8 @@ def main():
     # 数据参数
     parser.add_argument('--data_dir', type=str, default='data/RNAGym',
                         help='数据目录路径')
-    parser.add_argument('--dataset', type=str, default='Andreasson_2020_ribozyme',
-                        help='数据集名称')
+    parser.add_argument('--datasets', type=str, nargs='+', default=['Andreasson_2020_ribozyme'],
+                        help='数据集名称（可以指定多个）')
     parser.add_argument('--max_length', type=int, default=512,
                         help='最大序列长度')
     parser.add_argument('--train_ratio', type=float, default=0.8,
@@ -259,12 +259,12 @@ def main():
     
     # 显示可用数据集
     print("\n可用的数据集:")
-    datasets = get_available_datasets(args.data_dir)
-    for i, ds in enumerate(datasets, 1):
-        marker = "✓" if ds == args.dataset else " "
+    available_datasets = get_available_datasets(args.data_dir)
+    for i, ds in enumerate(available_datasets, 1):
+        marker = "✓" if ds in args.datasets else " "
         print(f"  [{marker}] {i}. {ds}")
     
-    print(f"\n当前选择的数据集: {args.dataset}")
+    print(f"\n当前选择的数据集: {', '.join(args.datasets)}")
     
     train(args)
 

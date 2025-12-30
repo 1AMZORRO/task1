@@ -62,21 +62,31 @@ class RNATokenizer:
 class RNAGymDataset(Dataset):
     """RNAGym数据集"""
     
-    def __init__(self, csv_file, tokenizer, max_length=512):
+    def __init__(self, csv_files, tokenizer, max_length=512):
         """
         Args:
-            csv_file: CSV文件路径
+            csv_files: CSV文件路径或路径列表
             tokenizer: RNA分词器
             max_length: 最大序列长度
         """
-        self.data = pd.read_csv(csv_file)
+        # 支持单个文件或多个文件
+        if isinstance(csv_files, str):
+            csv_files = [csv_files]
+        
+        # 加载并合并所有数据集
+        all_data = []
+        for csv_file in csv_files:
+            df = pd.read_csv(csv_file)
+            print(f"加载数据集: {csv_file}")
+            print(f"  样本数量: {len(df)}")
+            print(f"  序列长度范围: {df['sequence'].str.len().min()} - {df['sequence'].str.len().max()}")
+            all_data.append(df)
+        
+        self.data = pd.concat(all_data, ignore_index=True)
         self.tokenizer = tokenizer
         self.max_length = max_length
         
-        # 检查数据
-        print(f"加载数据集: {csv_file}")
-        print(f"样本数量: {len(self.data)}")
-        print(f"序列长度范围: {self.data['sequence'].str.len().min()} - {self.data['sequence'].str.len().max()}")
+        print(f"\n总样本数量: {len(self.data)}")
         
     def __len__(self):
         return len(self.data)
@@ -95,14 +105,14 @@ class RNAGymDataset(Dataset):
         }
 
 
-def load_rnagym_data(data_dir, dataset_name, tokenizer, batch_size=32, 
+def load_rnagym_data(data_dir, dataset_names, tokenizer, batch_size=32, 
                      train_ratio=0.8, max_length=512, num_workers=0):
     """
     加载RNAGym数据集并划分训练集和验证集
     
     Args:
         data_dir: 数据目录路径
-        dataset_name: 数据集名称（CSV文件名，不含扩展名）
+        dataset_names: 数据集名称（CSV文件名，不含扩展名）或名称列表
         tokenizer: RNA分词器
         batch_size: 批次大小
         train_ratio: 训练集比例
@@ -112,10 +122,15 @@ def load_rnagym_data(data_dir, dataset_name, tokenizer, batch_size=32,
     Returns:
         train_loader, val_loader: 训练和验证数据加载器
     """
-    csv_file = os.path.join(data_dir, f"{dataset_name}.csv")
+    # 支持单个数据集或多个数据集
+    if isinstance(dataset_names, str):
+        dataset_names = [dataset_names]
+    
+    # 构建CSV文件路径列表
+    csv_files = [os.path.join(data_dir, f"{name}.csv") for name in dataset_names]
     
     # 创建数据集
-    full_dataset = RNAGymDataset(csv_file, tokenizer, max_length)
+    full_dataset = RNAGymDataset(csv_files, tokenizer, max_length)
     
     # 划分训练集和验证集
     total_size = len(full_dataset)

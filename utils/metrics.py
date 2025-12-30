@@ -106,21 +106,11 @@ def calculate_all_metrics(y_true, y_pred):
     # MCC
     mcc = calculate_mcc(y_true, y_pred)
     
-    # MSE和RMSE (回归任务的基础指标)
-    mse = np.mean((y_true - y_pred) ** 2)
-    rmse = np.sqrt(mse)
-    
-    # MAE
-    mae = np.mean(np.abs(y_true - y_pred))
-    
     metrics = {
         'spearman': spearman_corr,
         'spearman_p': spearman_p,
         'auc': auc,
-        'mcc': mcc,
-        'mse': mse,
-        'rmse': rmse,
-        'mae': mae
+        'mcc': mcc
     }
     
     return metrics
@@ -138,5 +128,3 @@ def print_metrics(metrics, prefix=""):
     print(f"  Spearman相关系数: {metrics['spearman']:.4f} (p={metrics['spearman_p']:.4e})")
     print(f"  AUC: {metrics['auc']:.4f}")
     print(f"  MCC: {metrics['mcc']:.4f}")
-    print(f"  RMSE: {metrics['rmse']:.4f}")
-    print(f"  MAE: {metrics['mae']:.4f}")
