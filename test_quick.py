@@ -41,17 +41,26 @@ def test_model():
     # 创建模型
     model = create_model()
     
+    # 检查是否有CUDA
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"使用设备: {device}")
+    if torch.cuda.is_available():
+        print(f"GPU名称: {torch.cuda.get_device_name(0)}")
+    model = model.to(device)
+    
     # 测试前向传播
     batch_size = 4
     seq_len = 128
-    dummy_input = torch.randint(0, 8, (batch_size, seq_len))
+    dummy_input = torch.randint(0, 8, (batch_size, seq_len)).to(device)
     
     print(f"输入shape: {dummy_input.shape}")
+    print(f"输入设备: {dummy_input.device}")
     
     with torch.no_grad():
         output = model(dummy_input)
     
     print(f"输出shape: {output.shape}")
+    print(f"输出设备: {output.device}")
     print(f"输出示例: {output[:2]}")
     print("✓ 模型测试通过\n")
 
@@ -74,14 +83,15 @@ def test_data_loader():
     dataset_name = datasets[0]
     
     print(f"\n加载数据集: {dataset_name}")
-    train_loader, val_loader = load_rnagym_data(
+    train_loader, val_loader, fitness_stats = load_rnagym_data(
         data_dir=data_dir,
         dataset_name=dataset_name,
         tokenizer=tokenizer,
         batch_size=16,
         train_ratio=0.8,
         max_length=256,
-        num_workers=0
+        num_workers=0,
+        normalize_fitness=True
     )
     
     # 测试一个batch
@@ -89,7 +99,10 @@ def test_data_loader():
     print(f"\n批次数据:")
     print(f"  input_ids shape: {batch['input_ids'].shape}")
     print(f"  fitness shape: {batch['fitness'].shape}")
-    print(f"  fitness 示例: {batch['fitness'][:3]}")
+    print(f"  fitness 示例（标准化后）: {batch['fitness'][:3]}")
+    print(f"\nFitness标准化统计信息:")
+    print(f"  均值: {fitness_stats['mean']:.6f}")
+    print(f"  标准差: {fitness_stats['std']:.6f}")
     print("✓ 数据加载测试通过\n")
 
 
@@ -106,10 +119,11 @@ def test_metrics():
     
     metrics = calculate_all_metrics(y_true, y_pred)
     
-    print(f"Spearman: {metrics['spearman']:.4f}")
-    print(f"AUC: {metrics['auc']:.4f}")
-    print(f"MCC: {metrics['mcc']:.4f}")
+    print(f"Spearman相关系数: {metrics['spearman']:.4f}")
+    print(f"Pearson相关系数: {metrics['pearson']:.4f}")
+    print(f"R²分数: {metrics['r2']:.4f}")
     print(f"RMSE: {metrics['rmse']:.4f}")
+    print(f"MAE: {metrics['mae']:.4f}")
     print("✓ 评估指标测试通过\n")
 
 
