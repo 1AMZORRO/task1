@@ -149,13 +149,20 @@ def load_rnagym_data(data_dir, dataset_name, tokenizer, batch_size=32,
     total_size = len(df)
     
     # 创建分层列：使用DMS_score的分位数分箱
+    n_bins = 10  # 分箱数量
     try:
         # 尝试使用qcut进行等频分箱（推荐方式）
-        df['stratify_col'] = pd.qcut(df['DMS_score'], q=10, labels=False, duplicates='drop')
+        df['stratify_col'] = pd.qcut(df['DMS_score'], q=n_bins, labels=False, duplicates='drop')
     except (ValueError, TypeError) as e:
         # 如果qcut失败（例如重复值太多），回退到cut进行等宽分箱
-        print(f"  注意: pd.qcut失败 ({e})，使用pd.cut作为备选方案")
-        df['stratify_col'] = pd.cut(df['DMS_score'], bins=10, labels=False)
+        print(f"  警告: pd.qcut失败 ({e})，回退到pd.cut（等宽分箱）。这可能导致分层不太均衡。")
+        try:
+            df['stratify_col'] = pd.cut(df['DMS_score'], bins=n_bins, labels=False)
+        except (ValueError, TypeError) as e2:
+            # 如果pd.cut也失败，使用简单的分位数作为后备
+            print(f"  警告: pd.cut也失败 ({e2})，使用简单分位数分箱")
+            df['stratify_col'] = (df['DMS_score'].rank(pct=True) * n_bins).astype(int)
+            df.loc[df['stratify_col'] >= n_bins, 'stratify_col'] = n_bins - 1
     
     # 处理可能的NaN值（用-1填充）
     df['stratify_col'] = df['stratify_col'].fillna(-1)
