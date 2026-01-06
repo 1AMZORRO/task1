@@ -157,6 +157,9 @@ def load_rnagym_data(data_dir, dataset_name, tokenizer, batch_size=32,
         print(f"  注意: pd.qcut失败 ({e})，使用pd.cut作为备选方案")
         df['stratify_col'] = pd.cut(df['DMS_score'], bins=10, labels=False)
     
+    # 处理可能的NaN值（用-1填充）
+    df['stratify_col'] = df['stratify_col'].fillna(-1)
+    
     # 使用分层分割来划分训练集和验证集
     indices = np.arange(total_size)
     train_indices, val_indices = train_test_split(
@@ -165,6 +168,9 @@ def load_rnagym_data(data_dir, dataset_name, tokenizer, batch_size=32,
         stratify=df['stratify_col'],
         random_state=42
     )
+    
+    # 删除临时分层列以释放内存
+    df.drop('stratify_col', axis=1, inplace=True)
     
     # 计算训练集的fitness统计信息（用于标准化）
     train_fitness = df.iloc[train_indices]['DMS_score'].values
