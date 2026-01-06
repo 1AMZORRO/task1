@@ -95,16 +95,17 @@ def train(args):
     # 初始化tokenizer
     tokenizer = RNATokenizer()
     
-    # 加载数据
+    # 加载数据（返回fitness统计信息）
     print(f"\n加载数据集: {args.dataset}")
-    train_loader, val_loader = load_rnagym_data(
+    train_loader, val_loader, fitness_stats = load_rnagym_data(
         data_dir=args.data_dir,
         dataset_name=args.dataset,
         tokenizer=tokenizer,
         batch_size=args.batch_size,
         train_ratio=args.train_ratio,
         max_length=args.max_length,
-        num_workers=args.num_workers
+        num_workers=args.num_workers,
+        normalize_fitness=True  # 启用标准化
     )
     
     # 创建模型
@@ -172,7 +173,8 @@ def train(args):
                 'optimizer_state_dict': optimizer.state_dict(),
                 'val_loss': val_loss,
                 'val_metrics': val_metrics,
-                'model_config': model_config
+                'model_config': model_config,
+                'fitness_stats': fitness_stats  # 保存标准化统计信息
             }, model_path)
             print(f"\n✓ 保存最佳模型到: {model_path}")
         

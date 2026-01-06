@@ -25,6 +25,13 @@ def evaluate_model(model_path, data_dir, dataset_name, output_dir):
     checkpoint = torch.load(model_path, weights_only=False, map_location=device)
     model_config = checkpoint['model_config']
     
+    # 获取fitness统计信息（如果有）
+    fitness_stats = checkpoint.get('fitness_stats', None)
+    if fitness_stats:
+        print(f"\n从checkpoint加载fitness标准化信息:")
+        print(f"  均值: {fitness_stats['mean']:.6f}")
+        print(f"  标准差: {fitness_stats['std']:.6f}")
+    
     # 创建模型
     model = create_model(model_config)
     model.load_state_dict(checkpoint['model_state_dict'])
@@ -35,16 +42,19 @@ def evaluate_model(model_path, data_dir, dataset_name, output_dir):
     print(f"Best epoch: {checkpoint['epoch']}")
     print(f"Best val loss: {checkpoint['val_loss']:.6f}")
     
-    # 加载数据
+    # 加载数据（使用相同的标准化参数）
     tokenizer = RNATokenizer()
-    train_loader, val_loader = load_rnagym_data(
+    normalize_fitness = fitness_stats is not None and fitness_stats.get('normalize', True)
+    
+    train_loader, val_loader, _ = load_rnagym_data(
         data_dir=data_dir,
         dataset_name=dataset_name,
         tokenizer=tokenizer,
         batch_size=32,
         train_ratio=0.8,
         max_length=512,
-        num_workers=0
+        num_workers=0,
+        normalize_fitness=normalize_fitness
     )
     
     # 评估

@@ -106,7 +106,7 @@ class MambaRNAModel(nn.Module):
             input_ids: (batch, seq_len) - token IDs
             
         Returns:
-            predictions: (batch, 1) - 预测的fitness分数
+            predictions: (batch,) - 预测的fitness分数
         """
         # 嵌入
         x = self.embedding(input_ids)  # (batch, seq_len, d_model)
