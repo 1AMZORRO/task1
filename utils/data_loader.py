@@ -6,6 +6,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
+from sklearn.model_selection import train_test_split
 
 
 class RNATokenizer:
@@ -147,12 +148,23 @@ def load_rnagym_data(data_dir, dataset_name, tokenizer, batch_size=32,
     df = pd.read_csv(csv_file)
     total_size = len(df)
     
-    # 使用固定随机种子划分数据
-    np.random.seed(42)
-    indices = np.random.permutation(total_size)
-    train_size = int(total_size * train_ratio)
-    train_indices = indices[:train_size]
-    val_indices = indices[train_size:]
+    # 创建分层列：使用DMS_score的分位数分箱
+    try:
+        # 尝试使用qcut进行等频分箱（推荐方式）
+        df['stratify_col'] = pd.qcut(df['DMS_score'], q=10, labels=False, duplicates='drop')
+    except (ValueError, TypeError) as e:
+        # 如果qcut失败（例如重复值太多），回退到cut进行等宽分箱
+        print(f"  注意: pd.qcut失败 ({e})，使用pd.cut作为备选方案")
+        df['stratify_col'] = pd.cut(df['DMS_score'], bins=10, labels=False)
+    
+    # 使用分层分割来划分训练集和验证集
+    indices = np.arange(total_size)
+    train_indices, val_indices = train_test_split(
+        indices,
+        test_size=(1 - train_ratio),
+        stratify=df['stratify_col'],
+        random_state=42
+    )
     
     # 计算训练集的fitness统计信息（用于标准化）
     train_fitness = df.iloc[train_indices]['DMS_score'].values
