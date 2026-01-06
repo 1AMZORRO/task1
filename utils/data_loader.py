@@ -6,7 +6,6 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
-from sklearn.model_selection import train_test_split
 
 
 class RNATokenizer:
@@ -148,36 +147,12 @@ def load_rnagym_data(data_dir, dataset_name, tokenizer, batch_size=32,
     df = pd.read_csv(csv_file)
     total_size = len(df)
     
-    # 创建分层列：使用DMS_score的分位数分箱
-    n_bins = 10  # 分箱数量
-    try:
-        # 尝试使用qcut进行等频分箱（推荐方式）
-        df['stratify_col'] = pd.qcut(df['DMS_score'], q=n_bins, labels=False, duplicates='drop')
-    except (ValueError, TypeError) as e:
-        # 如果qcut失败（例如重复值太多），回退到cut进行等宽分箱
-        print(f"  警告: pd.qcut失败 ({e})，回退到pd.cut（等宽分箱）。这可能导致分层不太均衡。")
-        try:
-            df['stratify_col'] = pd.cut(df['DMS_score'], bins=n_bins, labels=False)
-        except (ValueError, TypeError) as e2:
-            # 如果pd.cut也失败，使用简单的分位数作为后备
-            print(f"  警告: pd.cut也失败 ({e2})，使用简单分位数分箱")
-            df['stratify_col'] = (df['DMS_score'].rank(pct=True) * n_bins).astype(int)
-            df.loc[df['stratify_col'] >= n_bins, 'stratify_col'] = n_bins - 1
-    
-    # 处理可能的NaN值（用-1填充）
-    df['stratify_col'] = df['stratify_col'].fillna(-1)
-    
-    # 使用分层分割来划分训练集和验证集
-    indices = np.arange(total_size)
-    train_indices, val_indices = train_test_split(
-        indices,
-        test_size=(1 - train_ratio),
-        stratify=df['stratify_col'],
-        random_state=42
-    )
-    
-    # 删除临时分层列以释放内存
-    df.drop('stratify_col', axis=1, inplace=True)
+    # 使用固定随机种子划分数据
+    np.random.seed(42)
+    indices = np.random.permutation(total_size)
+    train_size = int(total_size * train_ratio)
+    train_indices = indices[:train_size]
+    val_indices = indices[train_size:]
     
     # 计算训练集的fitness统计信息（用于标准化）
     train_fitness = df.iloc[train_indices]['DMS_score'].values
