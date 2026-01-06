@@ -118,12 +118,15 @@ class MambaRNAModel(nn.Module):
         
         x = self.norm(x)
         
-        # 池化：使用CLS token（第一个token）或平均池化
-        # 这里使用CLS token
-        cls_output = x[:, 0, :]  # (batch, d_model)
+        # 池化策略修改：
+        # 原代码：cls_output = x[:, 0, :] (错误：对于因果模型，位置0看不到后续序列)
+        # 新代码：使用 Mean Pooling (平均池化)
+        
+        # (batch, seq_len, d_model) -> (batch, d_model)
+        pooled_output = torch.mean(x, dim=1)
         
         # 回归预测
-        predictions = self.regression_head(cls_output)  # (batch, 1)
+        predictions = self.regression_head(pooled_output)  # (batch, 1)
         
         return predictions.squeeze(-1)  # (batch,)
     
